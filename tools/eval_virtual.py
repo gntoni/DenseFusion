@@ -15,7 +15,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.autograd import Variable
-from datasets.linemod.dataset import PoseDataset as PoseDataset_linemod
+from datasets.virtual.dataset import PoseDataset as PoseDataset_virtual
 from lib.network import PoseNet, PoseRefineNet
 from lib.loss import Loss
 from lib.loss_refiner import Loss_refine
@@ -30,13 +30,13 @@ parser.add_argument('--model', type=str, default = '',  help='resume PoseNet mod
 parser.add_argument('--refine_model', type=str, default = '',  help='resume PoseRefineNet model')
 opt = parser.parse_args()
 
-num_objects = 13
-objlist = [1, 2, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15]
+num_objects = 1
+objlist = [1]
 num_points = 500
 iteration = 4
 bs = 1
-dataset_config_dir = 'datasets/linemod/dataset_config'
-output_result_dir = 'experiments/eval_result/linemod'
+dataset_config_dir = 'datasets/virtual/dataset_config'
+output_result_dir = 'experiments/eval_result/virtual'
 #knn = KNearestNeighbor(1)
 
 estimator = PoseNet(num_points = num_points, num_obj = num_objects)
@@ -48,7 +48,7 @@ refiner.load_state_dict(torch.load(opt.refine_model))
 estimator.eval()
 refiner.eval()
 
-testdataset = PoseDataset_linemod('eval', num_points, False, opt.dataset_root, 0.0, True)
+testdataset = PoseDataset_virtual('eval', num_points, False, opt.dataset_root, 0.0, True)
 testdataloader = torch.utils.data.DataLoader(testdataset, batch_size=1, shuffle=False, num_workers=10)
 
 sym_list = testdataset.get_sym_list()
@@ -63,7 +63,7 @@ cinfo_file = open('{0}/camera_info.yml'.format(dataset_config_dir), 'r')
 cinfo = yaml.load(cinfo_file)
 cam_K = np.array(cinfo[1]['cam_K']).reshape(3,3)
 for obj in objlist:
-    diameter.append(meta[obj]['diameter'] / 1000.0 * 0.1)
+    diameter.append(meta[obj]['diameter'] * 0.1)
 print(diameter)
 
 success_count = [0 for i in range(num_objects)]

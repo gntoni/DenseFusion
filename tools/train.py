@@ -20,8 +20,10 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.autograd import Variable
+from torch.utils.tensorboard import SummaryWriter
 from datasets.ycb.dataset import PoseDataset as PoseDataset_ycb
 from datasets.linemod.dataset import PoseDataset as PoseDataset_linemod
+from datasets.virtual.dataset import PoseDataset as PoseDataset_virtual
 from lib.network import PoseNet, PoseRefineNet
 from lib.loss import Loss
 from lib.loss_refiner import Loss_refine
@@ -37,13 +39,14 @@ parser.add_argument('--lr_rate', default=0.3, help='learning rate decay rate')
 parser.add_argument('--w', default=0.015, help='learning rate')
 parser.add_argument('--w_rate', default=0.3, help='learning rate decay rate')
 parser.add_argument('--decay_margin', default=0.016, help='margin to decay lr & w')
-parser.add_argument('--refine_margin', default=0.013, help='margin to start the training of iterative refinement')
+parser.add_argument('--refine_margin', type=float, default=0.013, help='margin to start the training of iterative refinement')
 parser.add_argument('--noise_trans', default=0.03, help='range of the random noise of translation added to the training data')
 parser.add_argument('--iteration', type=int, default = 2, help='number of refinement iterations')
 parser.add_argument('--nepoch', type=int, default=500, help='max number of epochs to train')
 parser.add_argument('--resume_posenet', type=str, default = '',  help='resume PoseNet model')
 parser.add_argument('--resume_refinenet', type=str, default = '',  help='resume PoseRefineNet model')
 parser.add_argument('--start_epoch', type=int, default = 1, help='which epoch to start')
+parser.add_argument('--exp_name', type=str, default='densefusion', help='experiment name')
 opt = parser.parse_args()
 
 
@@ -64,9 +67,18 @@ def main():
         opt.outf = 'trained_models/linemod'
         opt.log_dir = 'experiments/logs/linemod'
         opt.repeat_epoch = 20
+    elif opt.dataset == 'virtual':
+        opt.num_objects = 1
+        opt.num_points = 500
+        opt.outf = 'trained_models/virtual'
+        opt.log_dir = 'experiments/logs/virtual'
+        opt.repeat_epoch = 20
     else:
         print('Unknown dataset')
         return
+
+    writer = SummaryWriter(log_dir="{}/{}_{}".format(opt.log_dir, opt.exp_name, time.strftime("%Y_%m_%d_%Hh_%Mm_%Ss", time.gmtime())))
+
 
     estimator = PoseNet(num_points = opt.num_points, num_obj = opt.num_objects)
     estimator.cuda()
@@ -93,11 +105,15 @@ def main():
         dataset = PoseDataset_ycb('train', opt.num_points, True, opt.dataset_root, opt.noise_trans, opt.refine_start)
     elif opt.dataset == 'linemod':
         dataset = PoseDataset_linemod('train', opt.num_points, True, opt.dataset_root, opt.noise_trans, opt.refine_start)
+    elif opt.dataset == 'virtual':
+        dataset = PoseDataset_virtual('train', opt.num_points, True, opt.dataset_root, opt.noise_trans, opt.refine_start)
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=True, num_workers=opt.workers)
     if opt.dataset == 'ycb':
         test_dataset = PoseDataset_ycb('test', opt.num_points, False, opt.dataset_root, 0.0, opt.refine_start)
     elif opt.dataset == 'linemod':
         test_dataset = PoseDataset_linemod('test', opt.num_points, False, opt.dataset_root, 0.0, opt.refine_start)
+    elif opt.dataset == 'virtual':
+        test_dataset = PoseDataset_virtual('test', opt.num_points, False, opt.dataset_root, 0.0, opt.refine_start)
     testdataloader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=opt.workers)
     
     opt.sym_list = dataset.get_sym_list()
@@ -110,14 +126,15 @@ def main():
 
     best_test = np.Inf
 
-    if opt.start_epoch == 1:
-        for log in os.listdir(opt.log_dir):
-            os.remove(os.path.join(opt.log_dir, log))
+    #if opt.start_epoch == 1:
+    #    for log in os.listdir(opt.log_dir):
+    #        os.remove(os.path.join(opt.log_dir, log))
     st_time = time.time()
 
     for epoch in range(opt.start_epoch, opt.nepoch):
-        logger = setup_logger('epoch%d' % epoch, os.path.join(opt.log_dir, 'epoch_%d_log.txt' % epoch))
-        logger.info('Train time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Training started'))
+        #logger = setup_logger('epoch%d' % epoch, os.path.join(opt.log_dir, 'epoch_%d_log.txt' % epoch))
+        #logger.info('Train time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Training started'))
+        print('Train time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Training started'))
         train_count = 0
         train_dis_avg = 0.0
         if opt.refine_start:
@@ -151,7 +168,9 @@ def main():
                 train_count += 1
 
                 if train_count % opt.batch_size == 0:
-                    logger.info('Train time {0} Epoch {1} Batch {2} Frame {3} Avg_dis:{4}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, int(train_count / opt.batch_size), train_count, train_dis_avg / opt.batch_size))
+                    #print("epcoh: {}    rep: {}    batch: {}    mycount: {}".format(epoch, rep, int(train_count / opt.batch_size), int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size))))
+                    #logger.info('Train time {0} Epoch {1} Batch {2} Frame {3} Avg_dis:{4}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, int(train_count / opt.batch_size), train_count, train_dis_avg / opt.batch_size))
+                    writer.add_scalar('Loss/train', train_dis_avg / opt.batch_size, int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size)))
                     optimizer.step()
                     optimizer.zero_grad()
                     train_dis_avg = 0
@@ -165,8 +184,8 @@ def main():
         print('>>>>>>>>----------epoch {0} train finish---------<<<<<<<<'.format(epoch))
 
 
-        logger = setup_logger('epoch%d_test' % epoch, os.path.join(opt.log_dir, 'epoch_%d_test_log.txt' % epoch))
-        logger.info('Test time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Testing started'))
+        #logger = setup_logger('epoch%d_test' % epoch, os.path.join(opt.log_dir, 'epoch_%d_test_log.txt' % epoch))
+        #logger.info('Test time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Testing started'))
         test_dis = 0.0
         test_count = 0
         estimator.eval()
@@ -189,12 +208,13 @@ def main():
                     dis, new_points, new_target = criterion_refine(pred_r, pred_t, new_target, model_points, idx, new_points)
 
             test_dis += dis.item()
-            logger.info('Test time {0} Test Frame No.{1} dis:{2}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), test_count, dis))
+            #logger.info('Test time {0} Test Frame No.{1} dis:{2}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), test_count, dis))
 
             test_count += 1
 
         test_dis = test_dis / test_count
-        logger.info('Test time {0} Epoch {1} TEST FINISH Avg dis: {2}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, test_dis))
+        writer.add_scalar('Loss/test', test_dis, epoch)
+        #logger.info('Test time {0} Epoch {1} TEST FINISH Avg dis: {2}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, test_dis))
         if test_dis <= best_test:
             best_test = test_dis
             if opt.refine_start:
