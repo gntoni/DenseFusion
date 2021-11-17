@@ -69,7 +69,7 @@ def main():
         opt.repeat_epoch = 20
     elif opt.dataset == 'virtual':
         opt.num_objects = 1
-        opt.num_points = 500
+        opt.num_points = 1000
         opt.outf = 'trained_models/virtual'
         opt.log_dir = 'experiments/logs/virtual'
         opt.repeat_epoch = 20
@@ -137,6 +137,8 @@ def main():
         print('Train time {0}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)) + ', ' + 'Training started'))
         train_count = 0
         train_dis_avg = 0.0
+        train_loss_avg = 0.0
+        train_conf_avg = 0.0
         if opt.refine_start:
             estimator.eval()
             refiner.train()
@@ -146,7 +148,7 @@ def main():
 
         for rep in range(opt.repeat_epoch):
             for i, data in enumerate(dataloader, 0):
-                points, choose, img, target, model_points, idx = data
+                points, choose, img, target, model_points, idx, _ = data
                 points, choose, img, target, model_points, idx = Variable(points).cuda(), \
                                                                  Variable(choose).cuda(), \
                                                                  Variable(img).cuda(), \
@@ -165,15 +167,21 @@ def main():
                     loss.backward()
 
                 train_dis_avg += dis.item()
+                train_loss_avg += loss.item()
+                train_conf_avg += pred_c.detach().mean().item()
                 train_count += 1
 
                 if train_count % opt.batch_size == 0:
                     #print("epcoh: {}    rep: {}    batch: {}    mycount: {}".format(epoch, rep, int(train_count / opt.batch_size), int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size))))
                     #logger.info('Train time {0} Epoch {1} Batch {2} Frame {3} Avg_dis:{4}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, int(train_count / opt.batch_size), train_count, train_dis_avg / opt.batch_size))
-                    writer.add_scalar('Loss/train', train_dis_avg / opt.batch_size, int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size)))
+                    writer.add_scalar('Dis/train', train_dis_avg / opt.batch_size, int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size)))
+                    writer.add_scalar('Loss/train', train_loss_avg / opt.batch_size, int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size)))
+                    writer.add_scalar('Conf/train', train_conf_avg / opt.batch_size, int((epoch-1)*(len(dataset)/opt.batch_size)*opt.repeat_epoch +int(train_count / opt.batch_size)))
                     optimizer.step()
                     optimizer.zero_grad()
                     train_dis_avg = 0
+                    train_loss_avg = 0
+                    train_conf_avg = 0
 
                 if train_count != 0 and train_count % 1000 == 0:
                     if opt.refine_start:
@@ -192,7 +200,7 @@ def main():
         refiner.eval()
 
         for j, data in enumerate(testdataloader, 0):
-            points, choose, img, target, model_points, idx = data
+            points, choose, img, target, model_points, idx, _ = data
             points, choose, img, target, model_points, idx = Variable(points).cuda(), \
                                                              Variable(choose).cuda(), \
                                                              Variable(img).cuda(), \
@@ -213,7 +221,7 @@ def main():
             test_count += 1
 
         test_dis = test_dis / test_count
-        writer.add_scalar('Loss/test', test_dis, epoch)
+        writer.add_scalar('Dis/test', test_dis, epoch)
         #logger.info('Test time {0} Epoch {1} TEST FINISH Avg dis: {2}'.format(time.strftime("%Hh %Mm %Ss", time.gmtime(time.time() - st_time)), epoch, test_dis))
         if test_dis <= best_test:
             best_test = test_dis

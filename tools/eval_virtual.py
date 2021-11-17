@@ -152,6 +152,12 @@ for i, data in enumerate(testdataloader, 0):
             pt2d = cam_K.dot(pt3d)
             pt2d = pt2d[:2]/pt2d[2]
             plt.plot(pt2d[0],pt2d[1], marker='o', markersize=0.5, color="red", alpha=0.4)
+
+        for pt3d in target:
+            pt2d = cam_K.dot(pt3d)
+            pt2d = pt2d[:2]/pt2d[2]
+            plt.plot(pt2d[0],pt2d[1], marker='o', markersize=0.5, color="green", alpha=0.4)
+
         plt.imshow(ori_img[0])
         plt.show()
 
