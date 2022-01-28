@@ -66,19 +66,21 @@ class PoseDataset(data.Dataset):
 
         self.length = len(self.list_rgb)
 
-        self.cam_cx = 128.0
-        self.cam_cy = 128.0
-        self.cam_fx = 166.81284772
-        self.cam_fy = 166.81284772
+        self.cam_cx = 320.0
+        self.cam_cy = 240.0
+        self.cam_fx = -312.77408948
+        self.cam_fy = 312.77408948
 
-        self.xmap = np.array([[j for i in range(256)] for j in range(256)])
-        self.ymap = np.array([[i for i in range(256)] for j in range(256)])
+        self.xmap = np.array([[j for i in range(640)] for j in range(480)])
+        self.ymap = np.array([[i for i in range(640)] for j in range(480)])
         
         self.num = num
         self.add_noise = add_noise
         self.trancolor = transforms.ColorJitter(0.2, 0.2, 0.2, 0.05)
-        self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        #self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        self.norm = transforms.Normalize(mean=[92.84, 99.7, 116.1], std=[57.021, 59.214, 67.446])
         #self.border_list = [-1, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680]
+        
         self.num_pt_mesh_large = 500
         self.num_pt_mesh_small = 500
         self.symmetry_obj_idx = []
@@ -90,11 +92,11 @@ class PoseDataset(data.Dataset):
         depth = np.array(Image.open(self.list_depth[index]))
         label = np.array(Image.open(self.list_label[index]))
         obj = self.list_obj[index]
-        rank = self.list_rank[index]        
+        rank = self.list_rank[index]
 
         meta = self.meta[obj][rank][0]
 
-        #print ("rgb closed: {}  depth closed: {}    label closed: {}".format(img.fp.closed))     
+        #print ("rgb closed: {}  depth closed: {}    label closed: {}".format(img.fp.closed))
 
 
         mask_depth = ma.getmaskarray(ma.masked_not_equal(depth, 0))
@@ -206,15 +208,6 @@ class PoseDataset(data.Dataset):
 
 
 
-#border_list = [-1, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680]
-#img_width = 480
-#img_length = 640
-border_list = [-1, 10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 210, 220, 230, 240, 250, 256]
-img_width = 256
-img_length = 256
-
-
-
 def mask_to_bbox(mask):
     mask = mask.astype(np.uint8)
     _, contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -230,6 +223,10 @@ def mask_to_bbox(mask):
             w = tmp_w
             h = tmp_h
     return [x, y, w, h]
+
+
+border_list = [-1, 40, 80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480, 520, 560, 600, 640, 680]
+#border_list = [-1, 10, 20, 40, 60, 80, 100, 120, 140, 160, 180, 200, 210, 220, 230, 240, 250, 256]
 
 
 def get_bbox(bbox):
