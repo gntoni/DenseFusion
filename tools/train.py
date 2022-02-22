@@ -47,6 +47,7 @@ parser.add_argument('--resume_posenet', type=str, default = '',  help='resume Po
 parser.add_argument('--resume_refinenet', type=str, default = '',  help='resume PoseRefineNet model')
 parser.add_argument('--start_epoch', type=int, default = 1, help='which epoch to start')
 parser.add_argument('--exp_name', type=str, default='densefusion', help='experiment name')
+parser.add_argument('--gpu_idx', type=int, default=None, help='gpu number. Uses cpu if value is None.')
 opt = parser.parse_args()
 
 
@@ -54,6 +55,11 @@ def main():
     opt.manualSeed = random.randint(1, 10000)
     random.seed(opt.manualSeed)
     torch.manual_seed(opt.manualSeed)
+
+    if opt.gpu_idx is None:
+        device = torch.device('cpu')
+    else:
+        device = torch.device('cuda:{}'.format(opt.gpu_idx))
 
     if opt.dataset == 'ycb':
         opt.num_objects = 21 #number of object classes in the dataset
@@ -81,9 +87,9 @@ def main():
 
 
     estimator = PoseNet(num_points = opt.num_points, num_obj = opt.num_objects)
-    estimator.cuda()
+    estimator.to(device)
     refiner = PoseRefineNet(num_points = opt.num_points, num_obj = opt.num_objects)
-    refiner.cuda()
+    refiner.to(device)
 
     if opt.resume_posenet != '':
         estimator.load_state_dict(torch.load('{0}/{1}'.format(opt.outf, opt.resume_posenet)))
@@ -149,12 +155,12 @@ def main():
         for rep in range(opt.repeat_epoch):
             for i, data in enumerate(dataloader, 0):
                 points, choose, img, target, model_points, idx, _ = data
-                points, choose, img, target, model_points, idx = Variable(points).cuda(), \
-                                                                 Variable(choose).cuda(), \
-                                                                 Variable(img).cuda(), \
-                                                                 Variable(target).cuda(), \
-                                                                 Variable(model_points).cuda(), \
-                                                                 Variable(idx).cuda()
+                points, choose, img, target, model_points, idx = Variable(points).to(device), \
+                                                                 Variable(choose).to(device), \
+                                                                 Variable(img).to(device), \
+                                                                 Variable(target).to(device), \
+                                                                 Variable(model_points).to(device), \
+                                                                 Variable(idx).to(device)
                 pred_r, pred_t, pred_c, emb = estimator(img, points, choose, idx)
                 loss, dis, new_points, new_target = criterion(pred_r, pred_t, pred_c, target, model_points, idx, points, opt.w, opt.refine_start)
                 
@@ -201,12 +207,12 @@ def main():
 
         for j, data in enumerate(testdataloader, 0):
             points, choose, img, target, model_points, idx, _ = data
-            points, choose, img, target, model_points, idx = Variable(points).cuda(), \
-                                                             Variable(choose).cuda(), \
-                                                             Variable(img).cuda(), \
-                                                             Variable(target).cuda(), \
-                                                             Variable(model_points).cuda(), \
-                                                             Variable(idx).cuda()
+            points, choose, img, target, model_points, idx = Variable(points).to(device), \
+                                                             Variable(choose).to(device), \
+                                                             Variable(img).to(device), \
+                                                             Variable(target).to(device), \
+                                                             Variable(model_points).to(device), \
+                                                             Variable(idx).to(device)
             pred_r, pred_t, pred_c, emb = estimator(img, points, choose, idx)
             _, dis, new_points, new_target = criterion(pred_r, pred_t, pred_c, target, model_points, idx, points, opt.w, opt.refine_start)
 
