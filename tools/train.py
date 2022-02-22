@@ -226,9 +226,9 @@ def main():
         if test_dis <= best_test:
             best_test = test_dis
             if opt.refine_start:
-                torch.save(refiner.state_dict(), '{0}/pose_refine_model_{1}_{2}.pth'.format(opt.outf, epoch, test_dis))
+                torch.save(refiner.state_dict(), '{0}/pose_refine_model_{1}_{2}_{3}.pth'.format(opt.outf, opt.exp_name, epoch, test_dis))
             else:
-                torch.save(estimator.state_dict(), '{0}/pose_model_{1}_{2}.pth'.format(opt.outf, epoch, test_dis))
+                torch.save(estimator.state_dict(), '{0}/pose_model_{1}_{2}_{3}.pth'.format(opt.outf, opt.exp_name, epoch, test_dis))
             print(epoch, '>>>>>>>>----------BEST TEST MODEL SAVED---------<<<<<<<<')
 
         if best_test < opt.decay_margin and not opt.decay_start:
